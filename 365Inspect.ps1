@@ -1136,34 +1136,112 @@ Function JSON-Report {
 
     $findings_count = 0
 
+    $criticalCount = 0
+    $highCount = 0
+    $mediumCount = 0
+    $lowCount = 0
+    $informationalCount = 0
+    $exchangeCount = 0
+    $sharepointCount = 0
+    $teamsCount = 0
+    $intuneCount = 0
+    $aadCount = 0
+    $securitycomplianceCount = 0
+    $tenantCount = 0
+
     foreach ($finding in $sortedFindings) {
         If ($null -NE $finding.AffectedObjects) {
             $findings_count += 1
 
-            $refs = @()
-
-            foreach ($ref in $finding.References) {
-                $refs += "$($ref.Text) : $($ref.Url)"
+            If ($finding.Impact -eq 'Critical') {
+                $criticalCount += 1
             }
+            ElseIf ($finding.Impact -eq 'High') {
+                $highCount += 1
+            }
+            ElseIf ($finding.Impact -eq 'Medium') {
+                $mediumCount += 1
+            }
+            ElseIf ($finding.Impact -eq 'Low') {
+                $lowCount += 1
+            }
+            ElseIf ($finding.Impact -eq 'Informational') {
+                $informationalCount += 1
+            }
+
+            Foreach ($service in $finding.Service) {
+                if ($service -match 'Exchange') { $exchangeCount += 1 }
+                elseif ($service -match 'SharePoint') { $sharepointCount += 1 }
+                elseif ($service -match 'Teams') { $teamsCount += 1 }
+                elseif ($service -match 'Intune') { $intuneCount += 1 }
+                elseif ($service -match 'AzureAD') { $aadCount += 1 }
+                elseif ($service -match 'SecurityandCompliance') { $securitycomplianceCount += 1 }
+                elseif ($service -eq 'Tenant') { $tenantCount += 1 }
+            }
+
+            $affected_objects = @()
+            $affected_objects = $finding.AffectedObjects | ForEach-Object {
+                "$($_)"
+            }
+
+            $refs = @()
+            $refs = $finding.References | ForEach-Object {
+                "[$($_.Text)]($($_.Url))"
+            }
+
+            # Remove any HTML tags from PowerShell code and add newlines after semicolons
+            $cleanPowerShell = $finding.PowerShell -replace '<[^>]+>', ''
+            $finding.PowerShell = $cleanPowerShell
 
             $result = [PSCustomObject]@{
                 ID              = $findings_count.ToString()
                 FindingName     = $finding.FindingName
-                AffectedObjects = $("$($finding.AffectedObjects)" | Out-String).Trim()
+                AffectedObjects = @($affected_objects)
                 Finding         = $finding.Description
                 DefaultValue    = $finding.DefaultValue
                 ExpectedValue   = $finding.ExpectedValue
                 InherentRisk    = $finding.Impact
-                'Residual Risk' = " "
+                RiskRating      = $finding.RiskRating
                 Remediation     = $finding.Remediation
-                References      = $($refs | Out-String)
+                References      = @($refs)
+                PowerShell      = $cleanPowerShell
             }
 
             $results += $result
         }
     }
 
-    $results | ConvertTo-Json | Out-File -FilePath $out_path\Report_$(Get-Date -Format "yyyy-MM-dd_hh-mm-ss").json
+    $stats = [PSCustomObject]@{
+        preparedBy = $UserPrincipalName
+        executedInspectorsCount = $findings_count
+        availableInspectorsCount = $inspectors.Count
+        orgName = $org_name
+        tenantDisplayName = $tenantDisplayName
+        tenantDomain = $global:tenantDomain
+        totalCount = $findings_count
+        criticalCount = $criticalCount
+        highCount = $highCount 
+        mediumCount = $mediumCount
+        lowCount = $lowCount
+        informationalCount = $informationalCount
+        selectedInspectors = $selected_inspectors
+        serviceBreakdown = @{
+            exchange = $exchangeCount
+            sharepoint = $sharepointCount
+            teams = $teamsCount
+            intune = $intuneCount 
+            aad = $aadCount
+            securityCompliance = $securitycomplianceCount
+            tenant = $tenantCount
+        }
+    }
+
+    $final_result = [PSCustomObject]@{
+        Stats    = $stats
+        Findings = $results
+    }
+
+    $final_result | ConvertTo-Json -Depth 10 | Out-File -FilePath $out_path\4s-Report_$(Get-Date -Format "yyyy-MM-dd_hh-mm-ss").json
 }
 
 Function All-Report {

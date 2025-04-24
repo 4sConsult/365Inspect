@@ -10,7 +10,7 @@ Function Create-365InspectApp {
 
     Write-Host "Connecting to Microsoft Graph Command Line Tools" -ForegroundColor Green
 
-    Connect-MgGraph -Scopes 'Application.ReadWrite.All', 'User.Read' -ContextScope Process -NoWelcome
+	Connect-MgGraph -Scopes 'Application.ReadWrite.All', 'User.Read', 'RoleManagement.ReadWrite.Directory' -ContextScope Process -NoWelcome
 
     $sp = ''
 
@@ -697,40 +697,40 @@ Function Create-365InspectApp {
         
     }
 
-    If (! $servicePrincipal) {
-        Write-Host "Creating Application Service Principal" -ForegroundColor Green
+	If (! $servicePrincipal) {
+		Write-Host "Creating Application Service Principal" -ForegroundColor Green
 
-        Invoke-GraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/servicePrincipals" -Body "{`"appId`": `"$appId`",`"appRoleAssignmentRequired`": true}" -ContentType 'application/json'
-    
-        $sp = (Invoke-GraphRequest -Method GET -Uri "https://graph.microsoft.com/beta/servicePrincipals?filter=appId eq '$($appId)'").value.id
+		Invoke-GraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/servicePrincipals" -Body "{`"appId`": `"$appId`",`"appRoleAssignmentRequired`": true}" -ContentType 'application/json'
+	
+		$sp = (Invoke-GraphRequest -Method GET -Uri "https://graph.microsoft.com/beta/servicePrincipals?filter=appId eq '$($appId)'").value.id
 
-        $meID = $me.id
+		$me = (Invoke-GraphRequest -Method GET -Uri "https://graph.microsoft.com/beta/me").id
 
-        $spBody = @"
-        {
-            "appRoleId": "00000000-0000-0000-0000-000000000000",
-            "resourceId": "$sp",
-            "principalId": "$meID"
-        }
+		$spBody = @"
+		{
+			"appRoleId": "00000000-0000-0000-0000-000000000000",
+			"resourceId": "$sp",
+			"principalId": "$me"
+		}
 "@
 
-        Invoke-GraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/servicePrincipals/$sp/appRoleAssignedTo" -Body $spBody -ContentType 'application/json'
-    }
-    Else {
-        $sp = (Invoke-GraphRequest -Method GET -Uri "https://graph.microsoft.com/beta/servicePrincipals?filter=appId eq '$($appId)'").value.id
+		Invoke-GraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/servicePrincipals/$sp/appRoleAssignedTo" -Body $spBody -ContentType 'application/json'
+	}
+	Else {
+		$sp = (Invoke-GraphRequest -Method GET -Uri "https://graph.microsoft.com/beta/servicePrincipals?filter=appId eq '$($appId)'").value.id
 
-        $meID = $me.id
+		$me = (Invoke-GraphRequest -Method GET -Uri "https://graph.microsoft.com/beta/me").id
 
-        $spBody = @"
-        {
-            "appRoleId": "00000000-0000-0000-0000-000000000000",
-            "resourceId": "$sp",
-            "principalId": "$meID"
-        }
+		$spBody = @"
+		{
+			"appRoleId": "00000000-0000-0000-0000-000000000000",
+			"resourceId": "$sp",
+			"principalId": "$me"
+		}
 "@
 
-        Invoke-GraphRequest -Method POST-Uri "https://graph.microsoft.com/beta/servicePrincipals/$sp/appRoleAssignedTo" -Body $spBody -ContentType 'application/json'
-    }
+		Invoke-GraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/servicePrincipals/$sp/appRoleAssignedTo" -Body $spBody -ContentType 'application/json'
+	}
 
     $certKey = [convert]::ToBase64String((Get-Content .\$($appName).cer -AsByteStream))
 
